@@ -5,47 +5,50 @@ const __basedir = path.join(__dirname, '/..');;
 
 exports.createVoucher = async (req, res) => {
   try {
-    if (req.body){
-        const vouchersCreated = await Voucher.create(req.body);
-        res.status(200).json({ vouchers: vouchersCreated, success: true})
-    } else {
-        let path =
-        __basedir + "/resources/static/assets/uploads/" + req.file.filename;
-  
-      readXlsxFile(path).then((rows) => {
-        // skip header
-        rows.shift();
-  
-        let Vouchers = [];
-  
-        rows.forEach((row) => {
-          let voucher = {
-            id: row[0],
-            name: row[1],
-            type: row[2],
-            code: row[3],
-            price: row[4],
-            expiry_date: row[5],
-          };
-  
-          Vouchers.push(voucher);
-        });
-  
-        Voucher.bulkCreate(Vouchers)
-          .then(() => {
-            res.status(200).send({
-              message: "Uploaded the file successfully: " + req.file.originalname,
-            });
-          })
-          .catch((error) => {
-            res.status(500).send({
-              message: "Fail to import data into database!",
-              error: error.message,
-            });
-          });
+    if (req.user.isAdmin && req.file){
+      let path =
+      __basedir + "/resources/static/assets/uploads/" + req.file.filename;
+
+    readXlsxFile(path).then((rows) => {
+      // skip header
+      rows.shift();
+
+      let Vouchers = [];
+
+      rows.forEach((row) => {
+        let voucher = {
+          id: row[0],
+          name: row[1],
+          type: row[2],
+          code: row[3],
+          price: row[4],
+          expiry_date: row[5],
+        };
+
+        Vouchers.push(voucher);
       });
-    }
-    
+
+      Voucher.bulkCreate(Vouchers)
+        .then(() => {
+          res.status(200).send({
+            message: "Uploaded the file successfully: " + req.file.originalname,
+          });
+        })
+        .catch((error) => {
+          res.status(500).send({
+            message: "Fail to import data into database!",
+            error: error.message,
+          });
+        });
+    });
+  } else if(req.user.isAdmin && req.body) {
+        
+    const vouchersCreated = await Voucher.create(req.body);
+    res.status(200).json({ vouchers: vouchersCreated, success: true})
+
+  } else {
+    res.status(400).json({ message: 'you are not authorized to access this service' , success: true});
+  }
   } catch (err) {
     console.log(err);
     res.status(500).send({
@@ -82,8 +85,14 @@ exports.updateVoucher = async (req,res) => {
     }
     const voucherId = req.params.id;
         try {
-                const voucher = await Voucher.update(req.body, {where : {id: voucherId}});
-                res.status(200).json({ message: 'Voucher updated successfully' , success: true});
+          console.log(req.user.isAdmin)
+          if(req.user.isAdmin){
+            const voucher = await Voucher.update(req.body, {where : {id: voucherId}});
+            res.status(200).json({ message: 'Voucher updated successfully' , success: true});
+          } else {
+            res.status(400).json({ message: 'you are not authorized to access this service' , success: true});
+          }
+               
         } catch (err) { 
             res.status(500).json({ message: err.message, success: false})
          }
@@ -91,10 +100,15 @@ exports.updateVoucher = async (req,res) => {
 
 exports.deleteVoucher = async (req,res) => {
     try {
-            const voucherId = req.params.id;
-            const deleteVoucher = await Voucher.destroy({where: {id: voucherId}}) 
+      if(req.user.isAdmin){
+        const voucherId = req.params.id;
+        const deleteVoucher = await Voucher.destroy({where: {id: voucherId}}) 
 
-            return res.status(200).json({message:'Voucher deleted successfully', success: true});
+        return res.status(200).json({message:'Voucher deleted successfully', success: true});
+      } else {
+        res.status(400).json({ message: 'you are not authorized to access this service' , success: true});
+      }
+            
 
     } catch (err) {
         res.status(500).json({ message: err.message, success: false})
